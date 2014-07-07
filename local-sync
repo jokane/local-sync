@@ -3,22 +3,22 @@ use strict;
 use warnings;
 use Getopt::Long;
 
+use Config::YAML;
+use Data::Dumper;
+
 sub usage {
-	print "local-sync [--get] [--put] [--delete] [--diff] [--slow] collection\n";
+	print "local-sync [--get] [--put] [--delete] [--diff] collection\n";
 }
 
 sub go {
-	my $sshport = "222";
 
 	# Parse command line options.
 	my $get = 0;
 	my $put = 0;
 	my $delete = 0;
 	my $diff = 0;
-	my $slow = 0;
-	my $here;
-	my $there;
-	my $extraOpts = "";
+	my $mode;
+	my $extraOptions = "";
 	my $subDir;
 
 	if(!GetOptions(
@@ -26,63 +26,93 @@ sub go {
 		'put!' => \$put,
 		'delete!' => \$delete,
 		'diff!' => \$diff,
-		'slow!' => \$slow,
-		'here=s' => \$here,
-		'there=s' => \$there,
-		'opts=s' => \$extraOpts,
+		'mode=s' => \$mode,
+		'opts=s' => \$extraOptions,
 		'subdirectory=s' => \$subDir
 	)) {
 		usage();
 		exit 1;
 	}
 
-	my $rsyncopts;
-	$rsyncopts .= " -vaubP ";
-	$rsyncopts .= " --no-g ";
-	$rsyncopts .= " --modify-window=1 ";
-	$rsyncopts .= " --include \".gitignore\" ";
-	$rsyncopts .= " --include \".git\" ";
-	$rsyncopts .= " --include \".htpasswd\" ";
-	$rsyncopts .= " --include \".htaccess\" ";
-	$rsyncopts .= " --include \".moodle\" ";
-	$rsyncopts .= " --exclude \".*\" ";
-	$rsyncopts .= " --exclude \"scarrbot.log\" ";
-	$rsyncopts .= " --backup-dir /tmp/rsync-backup ";
-	$rsyncopts .= " -e \"ssh -C -p $sshport\" ";
-	$rsyncopts .= " $extraOpts ";
+  # Read the configuration file, which should contain global options and 
+  # collection definitions.
+  my $config = Config::YAML->new(
+    config => $ENV{'HOME'}. "/.local-sync/config"
+  );
 
-	if($#ARGV != 0 && (!defined $here || !defined $there)) {
+  # Get the global rsync options.
+  my $globalOptions = $config->{"global-options"};
+  $globalOptions = join(" ", @$globalOptions);
+
+  # Figure out which collection we're dealing with.
+	if($#ARGV != 0) {
+	  print STDERR "No collection name given.\n";
+    usage();
+    exit 1;
+  }
+
+  my $collectionName = $ARGV[0];
+  my $collection = $config->{collections}{$collectionName};
+  if(!defined $collection) {
+	  print STDERR "Unknown collection $collectionName.\n";
 		usage();
 		exit 1;
 	}
 
-	# Figure out which collection we're dealing with.
-	if($#ARGV == 0) {
-		my $collection = $ARGV[0];
-		$collection =~ s/ //g;
-		$collection = lc $collection;
-
-		if(!defined $here || !defined $there) {
-			print STDERR "Unknown collection $collection.\n";
-			usage();
-			exit 1;
-		}
+  # Extract the source, destination, and (optionally) rsync options from the
+  # config for this collection.
+  my $here = $collection->{here};
+  if(!defined $here) {
+	  print STDERR "Collection $collectionName missing 'here' attribute.\n";
+		usage();
+		exit 1;
 	}
+  $here =~ s/~/$ENV{'HOME'}/g;
+    
+  my $there = $collection->{there};
+  if(!defined $there) {
+	  print STDERR "Collection $collectionName missing 'there' attribute.\n";
+		usage();
+		exit 1;
+	}
+  $there =~ s/~/$ENV{'HOME'}/g;
 
+  my $collectionOptions = $collection->{options};
+  if(defined $collectionOptions) {
+    $collectionOptions = join(" ", @$collectionOptions);
+  } else {
+    $collectionOptions = "";
+  }
+
+  # If a specific mode was requested, get those options too.
+  my $modeOptions = "";
+  if(defined $mode) {
+    $modeOptions = $config->{modes}{$mode};
+    $modeOptions = join(" ", @$modeOptions);
+  }
+
+  # Append any requested subdirectory to the here and there.
 	if(defined $subDir) {
 		$here =~ s/\."?$/$subDir\/./;
 		$there =~ s/\."?$/$subDir\/./;
 	}
 
-	if($slow) {
-		$rsyncopts .= " --bwlimit=100";
-	}
+  # Build the complete options string.
+  my $rsyncopts = join(" ",
+    $globalOptions,
+    $modeOptions,
+    $collectionOptions,
+    $extraOptions
+  );
 
-	$here = "\"$here\"";
-	$there = "\"$there\"";
-
+  # Summarize what we're going to do.
 	print "local: $here\n";
 	print "remote: $there\n";
+  print "rsync options:\n";
+  print "  global: $globalOptions\n";
+  print "  mode: $modeOptions\n";
+  print "  collection: $collectionOptions\n";
+  print "  command line: $extraOptions\n";
 
 	# Make sure the requested operations make sense.
 	if($get && $put && $delete) {
@@ -135,11 +165,13 @@ sub go {
 		if(fork == 0) {
 			# Child process.  Create the local listing, then exit.
 			system("rsync $rsyncopts $here $filters > /tmp/local-sync-temp-local");
+      print "Got local file list.\n";
 			exit 1;
 		} else {
 			# Parent process.  Create the remote listing, then wait for the child
 			# process to finish.
 			system("rsync $rsyncopts $there $filters > /tmp/local-sync-temp-remote");
+      print "Got remote file list.\n";
 			wait;
 		}
 
