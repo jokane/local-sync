@@ -1,0 +1,191 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Getopt::Long;
+
+sub usage {
+	print "local-sync [--get] [--put] [--delete] [--diff] [--slow] collection\n";
+}
+
+sub go {
+	my $sshport = "222";
+
+	# Parse command line options.
+	my $get = 0;
+	my $put = 0;
+	my $delete = 0;
+	my $diff = 0;
+	my $slow = 0;
+	my $here;
+	my $there;
+	my $extraOpts = "";
+	my $subDir;
+
+	if(!GetOptions(
+		'get!' => \$get,
+		'put!' => \$put,
+		'delete!' => \$delete,
+		'diff!' => \$diff,
+		'slow!' => \$slow,
+		'here=s' => \$here,
+		'there=s' => \$there,
+		'opts=s' => \$extraOpts,
+		'subdirectory=s' => \$subDir
+	)) {
+		usage();
+		exit 1;
+	}
+
+	my $rsyncopts;
+	$rsyncopts .= " -vaubP ";
+	$rsyncopts .= " --no-g ";
+	$rsyncopts .= " --modify-window=1 ";
+	$rsyncopts .= " --include \".gitignore\" ";
+	$rsyncopts .= " --include \".git\" ";
+	$rsyncopts .= " --include \".htpasswd\" ";
+	$rsyncopts .= " --include \".htaccess\" ";
+	$rsyncopts .= " --include \".moodle\" ";
+	$rsyncopts .= " --exclude \".*\" ";
+	$rsyncopts .= " --exclude \"scarrbot.log\" ";
+	$rsyncopts .= " --backup-dir /tmp/rsync-backup ";
+	$rsyncopts .= " -e \"ssh -C -p $sshport\" ";
+	$rsyncopts .= " $extraOpts ";
+
+	if($#ARGV != 0 && (!defined $here || !defined $there)) {
+		usage();
+		exit 1;
+	}
+
+	# Figure out which collection we're dealing with.
+	if($#ARGV == 0) {
+		my $collection = $ARGV[0];
+		$collection =~ s/ //g;
+		$collection = lc $collection;
+
+		if(!defined $here || !defined $there) {
+			print STDERR "Unknown collection $collection.\n";
+			usage();
+			exit 1;
+		}
+	}
+
+	if(defined $subDir) {
+		$here =~ s/\."?$/$subDir\/./;
+		$there =~ s/\."?$/$subDir\/./;
+	}
+
+	if($slow) {
+		$rsyncopts .= " --bwlimit=100";
+	}
+
+	$here = "\"$here\"";
+	$there = "\"$there\"";
+
+	print "local: $here\n";
+	print "remote: $there\n";
+
+	# Make sure the requested operations make sense.
+	if($get && $put && $delete) {
+		print STDERR "Refusing to delete in both directions.\n";
+		usage();
+		exit 1;
+	}
+
+	if($diff && ($get || $put)) {
+		print STDERR "Cannot get/put and diff at the same time.\n";
+		usage();
+		exit 1;
+	}
+
+	if(!$get && !$put && !$diff) {
+		print STDERR "Nothing to do.\n";
+		usage();
+		exit 1;
+	}
+
+
+	# Possibly find differences between the local and the remote.
+	if($diff) {
+		# Get file listings for both the local and remote sides. 
+
+		# Some filters to apply to the output to minimize the number of "false
+		# positives" for changes:
+		my $filters = "";
+
+		# Remove lines at top and bottom of output.
+		$filters .= "|grep -v \"file list ...\"";
+		$filters .= "|grep -v \"[0-9]* files ...\"";
+		$filters .= "|grep -v \"bytes  received\"";
+		$filters .= "|grep -v \"speedup is\"";
+		$filters .= "|grep -v \"incremental file list\"";
+
+		# Remove lines for the directories themselves, because they can show up
+		# with different sizes.
+		$filters .= "| grep -v \"^d\"";
+
+		# Remove the file permissions, since sometimes we use FAT kinds of
+		# filesystems that don't fully support them.  Other times we don't really
+		# care about the permissions.
+		$filters .= "| sed -e\"s/^..........//\" ";
+
+		# Remove seconds.  Since FAT uses only 2-second resolution, these may not
+		# match exactly.  Other times, minutes are quite good enough.
+		$filters .= "| sed -e\"s/:[0-9][0-9] / /\" ";
+
+		if(fork == 0) {
+			# Child process.  Create the local listing, then exit.
+			system("rsync $rsyncopts $here $filters > /tmp/local-sync-temp-local");
+			exit 1;
+		} else {
+			# Parent process.  Create the remote listing, then wait for the child
+			# process to finish.
+			system("rsync $rsyncopts $there $filters > /tmp/local-sync-temp-remote");
+			wait;
+		}
+
+		# Show the differences between the files.
+		system("gvimdiff /tmp/local-sync-temp-local /tmp/local-sync-temp-remote");
+	}
+
+	# If we're deleting things, change the options to get this to happen.
+	if($delete) {
+		if($get) {
+			print "This will delete files from \n  $here\nthat do not exist on \n  $there\n";
+		} else {
+			print "This will delete files from \n  $there\nthat do not exist on \n  $here\n";
+		}
+		print "\nReally do this?";
+		my $ans = <STDIN>;
+		if($ans !~ /^y/) {
+			print "Quitting.\n";
+			exit 1;
+		}
+
+		$rsyncopts .= " --delete ";
+	}
+
+	# Possibly get updates from the remote version to here.
+	if($get) {
+		my $cmd = "rsync $rsyncopts $there $here";
+		#print "$cmd\n";
+		if(0 != system $cmd) {
+			print STDERR "Failed getting updates\n.";
+			exit 1;
+		}
+	}
+
+	# Possibly send updates from the local version to the remote.
+	if($put) {
+		my $cmd = "rsync $rsyncopts $here $there";
+		#print "$cmd\n";
+		if(0 != system $cmd) {
+			print STDERR "Failed sending updates\n.";
+			exit 1;
+		}
+	}	
+
+}
+
+go;
+
+
