@@ -138,6 +138,10 @@ sub go {
 	if($diff) {
 		# Get file listings for both the local and remote sides. 
 
+		# Vaporize any backup-dir that might be there, because it started causing
+		# problems at some point.
+		$rsyncopts =~ s/--backup-dir\s\S*//;
+
 		# Some filters to apply to the output to minimize the number of "false
 		# positives" for changes:
 		my $filters = "";
