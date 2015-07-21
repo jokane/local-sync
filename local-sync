@@ -99,10 +99,10 @@ sub go {
 
   # Build the complete options string.
   my $rsyncopts = join(" ",
-    $globalOptions,
-    $modeOptions,
+    $extraOptions,
     $collectionOptions,
-    $extraOptions
+    $modeOptions,
+    $globalOptions
   );
 
   # Summarize what we're going to do.
