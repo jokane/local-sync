@@ -12,6 +12,7 @@ sub usage {
   print "   --get\n";
   print "   --put\n";
   print "   --diff\n";
+  print "   --filediff [filename]\n";
   print "Options:\n";
   print "   --delete\n";
   print "   --sub [directory]\n";
@@ -24,6 +25,7 @@ sub go {
 	my $put = 0;
 	my $delete = 0;
 	my $diff = 0;
+  my $fileDiff;
 	my $mode;
 	my $extraOptions = "";
 	my $subDir;
@@ -33,6 +35,7 @@ sub go {
 		'put!' => \$put,
 		'delete!' => \$delete,
 		'diff!' => \$diff,
+		'filediff=s' => \$fileDiff,
 		'mode=s' => \$mode,
 		'opts=s' => \$extraOptions,
 		'subdirectory=s' => \$subDir
@@ -115,11 +118,13 @@ sub go {
   # Summarize what we're going to do.
 	print "local: $here\n";
 	print "remote: $there\n";
-  print "rsync options:\n";
-  print "  global: $globalOptions\n";
-  print "  mode: $modeOptions\n";
-  print "  collection: $collectionOptions\n";
-  print "  command line: $extraOptions\n";
+  if(!$fileDiff) {
+    print "rsync options:\n";
+    print "  global: $globalOptions\n";
+    print "  mode: $modeOptions\n";
+    print "  collection: $collectionOptions\n";
+    print "  command line: $extraOptions\n";
+  }
 
 	# Make sure the requested operations make sense.
 	if($get && $put && $delete) {
@@ -134,11 +139,17 @@ sub go {
 		exit 1;
 	}
 
-	if(!$get && !$put && !$diff) {
+	if(!$get && !$put && !$diff && !$fileDiff) {
 		print STDERR "Nothing to do.\n";
 		usage();
 		exit 1;
 	}
+
+  if($fileDiff && ($get || $put || $diff)) {
+    print STDERR "Cannot combine filediff with other verbs.\n";
+    usage();
+    exit 1;
+  }
 
 
 	# Possibly find differences between the local and the remote.
@@ -193,6 +204,18 @@ sub go {
       print "File lists are already open.\n";
     }
 	}
+
+  # Possibly compare two individual files.
+  if($fileDiff) {
+    system("scp $here/$fileDiff /tmp/local-sync-filediff-local");
+    system("scp $there/$fileDiff /tmp/local-sync-filediff-remote");
+		# Show the differences between the files.
+    if(!-e "/tmp/.local-sync-filediff-local.swp") {
+      system("gvimdiff /tmp/local-sync-filediff-local /tmp/local-sync-filediff-remote");
+    } else {
+      print "Compared files are already open.\n";
+    }
+  }
 
 	# If we're deleting things, change the options to get this to happen.
 	if($delete) {
