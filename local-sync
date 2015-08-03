@@ -7,7 +7,14 @@ use Config::YAML;
 use Data::Dumper;
 
 sub usage {
-	print "local-sync [--get] [--put] [--delete] [--diff] collection\n";
+	print "local-sync [verb] [options] collection\n";
+  print "Verbs:\n";
+  print "   --get\n";
+  print "   --put\n";
+  print "   --diff\n";
+  print "Options:\n";
+  print "   --delete\n";
+  print "   --sub [directory]\n";
 }
 
 sub go {
