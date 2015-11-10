@@ -13,6 +13,7 @@ sub usage {
   print "   --put\n";
   print "   --diff\n";
   print "   --filediff [filename]\n";
+  print "   --list-collections\n";
   print "Options:\n";
   print "   --delete\n";
   print "   --sub [directory]\n";
@@ -26,6 +27,7 @@ sub go {
 	my $delete = 0;
 	my $diff = 0;
   my $fileDiff;
+  my $list;
 	my $mode;
 	my $extraOptions = "";
 	my $subDir;
@@ -36,6 +38,7 @@ sub go {
 		'delete!' => \$delete,
 		'diff!' => \$diff,
 		'filediff=s' => \$fileDiff,
+		'list!' => \$list,
 		'mode=s' => \$mode,
 		'opts=s' => \$extraOptions,
 		'subdirectory=s' => \$subDir
@@ -49,6 +52,14 @@ sub go {
   my $config = Config::YAML->new(
     config => $ENV{'HOME'}. "/.local-sync/config"
   );
+
+  # If we're listing collections, we can do that and stop early.
+  if($list) {
+    for my $collection (sort keys $config->{collections}) {
+      print "$collection\n";
+    }
+    exit 0;
+  }
 
   # Get the global rsync options.
   my $globalOptions = $config->{"global-options"};
