@@ -55,7 +55,7 @@ sub go {
 
   # If we're listing collections, we can do that and stop early.
   if($list) {
-    for my $collection (sort keys $config->{collections}) {
+    for my $collection (sort keys %{$config->{collections}}) {
       print "$collection\n";
     }
     exit 0;
