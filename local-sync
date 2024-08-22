@@ -210,7 +210,7 @@ sub go {
 
 		# Show the differences between the files.
     if(!-e "/tmp/.local-sync-temp-local.swp") {
-      system("gvimdiff /tmp/local-sync-temp-local /tmp/local-sync-temp-remote");
+      system("vimdiff /tmp/local-sync-temp-local /tmp/local-sync-temp-remote");
     } else {
       print "File lists are already open.\n";
     }
@@ -222,7 +222,7 @@ sub go {
     system("scp $there/$fileDiff /tmp/local-sync-filediff-remote");
 		# Show the differences between the files.
     if(!-e "/tmp/.local-sync-filediff-local.swp") {
-      system("gvimdiff /tmp/local-sync-filediff-local /tmp/local-sync-filediff-remote");
+      system("vimdiff /tmp/local-sync-filediff-local /tmp/local-sync-filediff-remote");
     } else {
       print "Compared files are already open.\n";
     }
