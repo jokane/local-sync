@@ -7,7 +7,7 @@ use Config::YAML;
 use Data::Dumper;
 
 sub usage {
-	print "local-sync [verb] [options] collection\n";
+    print "local-sync [verb] [options] collection\n";
   print "Verbs:\n";
   print "   --get\n";
   print "   --put\n";
@@ -21,31 +21,33 @@ sub usage {
 
 sub go {
 
-	# Parse command line options.
-	my $get = 0;
-	my $put = 0;
-	my $delete = 0;
-	my $diff = 0;
-  my $fileDiff;
-  my $list;
-	my $mode;
-	my $extraOptions = "";
-	my $subDir;
+    # Parse command line options.
+    my $get = 0;
+    my $put = 0;
+    my $delete = 0;
+    my $diff = 0;
+    my $fileDiff;
+    my $list;
+    my $mode;
+    my $extraOptions = "";
+    my $subDir;
+    my $yes;
 
-	if(!GetOptions(
-		'get!' => \$get,
-		'put!' => \$put,
-		'delete!' => \$delete,
-		'diff!' => \$diff,
-		'filediff=s' => \$fileDiff,
-		'list!' => \$list,
-		'mode=s' => \$mode,
-		'opts=s' => \$extraOptions,
-		'subdirectory=s' => \$subDir
-	)) {
-		usage();
-		exit 1;
-	}
+    if(!GetOptions(
+        'get!' => \$get,
+        'put!' => \$put,
+        'delete!' => \$delete,
+        'yes!' => \$yes,
+        'diff!' => \$diff,
+        'filediff=s' => \$fileDiff,
+        'list!' => \$list,
+        'mode=s' => \$mode,
+        'opts=s' => \$extraOptions,
+        'subdirectory=s' => \$subDir
+    )) {
+        usage();
+        exit 1;
+    }
 
   # Read the configuration file, which should contain global options and 
   # collection definitions.
@@ -66,8 +68,8 @@ sub go {
   $globalOptions = join(" ", @$globalOptions);
 
   # Figure out which collection we're dealing with.
-	if($#ARGV != 0) {
-	  print STDERR "No collection name given.\n";
+    if($#ARGV != 0) {
+      print STDERR "No collection name given.\n";
     usage();
     exit 1;
   }
@@ -75,27 +77,27 @@ sub go {
   my $collectionName = $ARGV[0];
   my $collection = $config->{collections}{$collectionName};
   if(!defined $collection) {
-	  print STDERR "Unknown collection $collectionName.\n";
-		usage();
-		exit 1;
-	}
+      print STDERR "Unknown collection $collectionName.\n";
+        usage();
+        exit 1;
+    }
 
   # Extract the source, destination, and (optionally) rsync options from the
   # config for this collection.
   my $here = $collection->{here};
   if(!defined $here) {
-	  print STDERR "Collection $collectionName missing 'here' attribute.\n";
-		usage();
-		exit 1;
-	}
+      print STDERR "Collection $collectionName missing 'here' attribute.\n";
+        usage();
+        exit 1;
+    }
   $here =~ s/~/$ENV{'HOME'}/g;
     
   my $there = $collection->{there};
   if(!defined $there) {
-	  print STDERR "Collection $collectionName missing 'there' attribute.\n";
-		usage();
-		exit 1;
-	}
+      print STDERR "Collection $collectionName missing 'there' attribute.\n";
+        usage();
+        exit 1;
+    }
   $there =~ s/~/$ENV{'HOME'}/g;
 
   my $collectionOptions = $collection->{options};
@@ -113,10 +115,10 @@ sub go {
   }
 
   # Append any requested subdirectory to the here and there.
-	if(defined $subDir) {
-		$here =~ s/\."?$/$subDir\/./;
-		$there =~ s/\."?$/$subDir\/./;
-	}
+    if(defined $subDir) {
+        $here =~ s/\."?$/$subDir\/./;
+        $there =~ s/\."?$/$subDir\/./;
+    }
 
   # Build the complete options string.
   my $rsyncopts = join(" ",
@@ -127,8 +129,8 @@ sub go {
   );
 
   # Summarize what we're going to do.
-	print "local: $here\n";
-	print "remote: $there\n";
+    print "local: $here\n";
+    print "remote: $there\n";
   if(!$fileDiff) {
     print "rsync options:\n";
     print "  global: $globalOptions\n";
@@ -137,24 +139,24 @@ sub go {
     print "  command line: $extraOptions\n";
   }
 
-	# Make sure the requested operations make sense.
-	if($get && $put && $delete) {
-		print STDERR "Refusing to delete in both directions.\n";
-		usage();
-		exit 1;
-	}
+    # Make sure the requested operations make sense.
+    if($get && $put && $delete) {
+        print STDERR "Refusing to delete in both directions.\n";
+        usage();
+        exit 1;
+    }
 
-	if($diff && ($get || $put)) {
-		print STDERR "Cannot get/put and diff at the same time.\n";
-		usage();
-		exit 1;
-	}
+    if($diff && ($get || $put)) {
+        print STDERR "Cannot get/put and diff at the same time.\n";
+        usage();
+        exit 1;
+    }
 
-	if(!$get && !$put && !$diff && !$fileDiff) {
-		print STDERR "Nothing to do.\n";
-		usage();
-		exit 1;
-	}
+    if(!$get && !$put && !$diff && !$fileDiff) {
+        print STDERR "Nothing to do.\n";
+        usage();
+        exit 1;
+    }
 
   if($fileDiff && ($get || $put || $diff)) {
     print STDERR "Cannot combine filediff with other verbs.\n";
@@ -163,64 +165,64 @@ sub go {
   }
 
 
-	# Possibly find differences between the local and the remote.
-	if($diff) {
-		# Get file listings for both the local and remote sides. 
+    # Possibly find differences between the local and the remote.
+    if($diff) {
+        # Get file listings for both the local and remote sides. 
 
-		# Vaporize any backup-dir that might be there, because it started causing
-		# problems at some point.
-		$rsyncopts =~ s/--backup-dir\s\S*//;
+        # Vaporize any backup-dir that might be there, because it started causing
+        # problems at some point.
+        $rsyncopts =~ s/--backup-dir\s\S*//;
 
-		# Some filters to apply to the output to minimize the number of "false
-		# positives" for changes:
-		my $filters = "";
+        # Some filters to apply to the output to minimize the number of "false
+        # positives" for changes:
+        my $filters = "";
 
-		# Remove lines at top and bottom of output.
-		$filters .= "|grep -v \"file list ...\"";
-		$filters .= "|grep -v \"[0-9]* files ...\"";
-		$filters .= "|grep -v \"bytes  received\"";
-		$filters .= "|grep -v \"speedup is\"";
-		$filters .= "|grep -v \"incremental file list\"";
+        # Remove lines at top and bottom of output.
+        $filters .= "|grep -v \"file list ...\"";
+        $filters .= "|grep -v \"[0-9]* files ...\"";
+        $filters .= "|grep -v \"bytes  received\"";
+        $filters .= "|grep -v \"speedup is\"";
+        $filters .= "|grep -v \"incremental file list\"";
 
-		# Remove lines for the directories themselves, because they can show up
-		# with different sizes.
-		$filters .= "| grep -v \"^d\"";
+        # Remove lines for the directories themselves, because they can show up
+        # with different sizes.
+        $filters .= "| grep -v \"^d\"";
 
-		# Remove the file permissions, since sometimes we use FAT kinds of
-		# filesystems that don't fully support them.  Other times we don't really
-		# care about the permissions.
-		$filters .= "| sed -e\"s/^..........//\" ";
+        # Remove the file permissions, since sometimes we use FAT kinds of
+        # filesystems that don't fully support them.  Other times we don't really
+        # care about the permissions.
+        $filters .= "| sed -e\"s/^..........//\" ";
 
-		# Remove seconds.  Since FAT uses only 2-second resolution, these may not
-		# match exactly.  Other times, minutes are quite good enough.
-		$filters .= "| sed -e\"s/:[0-9][0-9] / /\" ";
+        # Remove seconds.  Since FAT uses only 2-second resolution, these may not
+        # match exactly.  Other times, minutes are quite good enough.
+        $filters .= "| sed -e\"s/:[0-9][0-9] / /\" ";
 
-		if(fork == 0) {
-			# Child process.  Create the local listing, then exit.
-			system("rsync $rsyncopts $here $filters > /tmp/local-sync-temp-local");
+        if(fork == 0) {
+            # Child process.  Create the local listing, then exit.
+            system("rsync $rsyncopts $here $filters > /tmp/local-sync-temp-local");
       print "Got local file list.\n";
-			exit 1;
-		} else {
-			# Parent process.  Create the remote listing, then wait for the child
-			# process to finish.
-			system("rsync $rsyncopts $there $filters > /tmp/local-sync-temp-remote");
+            exit 1;
+        } else {
+            # Parent process.  Create the remote listing, then wait for the child
+            # process to finish.
+            system("rsync $rsyncopts $there $filters > /tmp/local-sync-temp-remote");
       print "Got remote file list.\n";
-			wait;
-		}
+            wait;
+        }
 
-		# Show the differences between the files.
+        # Show the differences between the files.
     if(!-e "/tmp/.local-sync-temp-local.swp") {
       system("nvim -d /tmp/local-sync-temp-local /tmp/local-sync-temp-remote");
     } else {
       print "File lists are already open.\n";
     }
-	}
+    }
 
   # Possibly compare two individual files.
   if($fileDiff) {
     system("scp $here/$fileDiff /tmp/local-sync-filediff-local");
     system("scp $there/$fileDiff /tmp/local-sync-filediff-remote");
-		# Show the differences between the files.
+        # Show the differences between the files.
     if(!-e "/tmp/.local-sync-filediff-local.swp") {
       system("nvim -d /tmp/local-sync-filediff-local /tmp/local-sync-filediff-remote");
     } else {
@@ -228,42 +230,44 @@ sub go {
     }
   }
 
-	# If we're deleting things, change the options to get this to happen.
-	if($delete) {
-		if($get) {
-			print "This will delete files from \n  $here\nthat do not exist on \n  $there\n";
-		} else {
-			print "This will delete files from \n  $there\nthat do not exist on \n  $here\n";
-		}
-		print "\nReally do this?";
-		my $ans = <STDIN>;
-		if($ans !~ /^y/) {
-			print "Quitting.\n";
-			exit 1;
-		}
+    # If we're deleting things, change the options to get this to happen.
+    if($delete) {
+        if(!$yes) { 
+            if($get) {
+                print "This will delete files from \n  $here\nthat do not exist on \n  $there\n";
+            } else {
+                print "This will delete files from \n  $there\nthat do not exist on \n  $here\n";
+            }
+            print "\nReally do this?";
+            my $ans = <STDIN>;
+            if($ans !~ /^y/) {
+                print "Quitting.\n";
+                exit 1;
+            }
+        }
 
-		$rsyncopts .= " --delete ";
-	}
+        $rsyncopts .= " --delete ";
+    }
 
-	# Possibly get updates from the remote version to here.
-	if($get) {
-		my $cmd = "rsync $rsyncopts $there $here";
-		#print "$cmd\n";
-		if(0 != system $cmd) {
-			print STDERR "Failed getting updates\n.";
-			exit 1;
-		}
-	}
+    # Possibly get updates from the remote version to here.
+    if($get) {
+        my $cmd = "rsync $rsyncopts $there $here";
+        #print "$cmd\n";
+        if(0 != system $cmd) {
+            print STDERR "Failed getting updates\n.";
+            exit 1;
+        }
+    }
 
-	# Possibly send updates from the local version to the remote.
-	if($put) {
-		my $cmd = "rsync $rsyncopts $here $there";
-		#print "$cmd\n";
-		if(0 != system $cmd) {
-			print STDERR "Failed sending updates\n.";
-			exit 1;
-		}
-	}	
+    # Possibly send updates from the local version to the remote.
+    if($put) {
+        my $cmd = "rsync $rsyncopts $here $there";
+        #print "$cmd\n";
+        if(0 != system $cmd) {
+            print STDERR "Failed sending updates\n.";
+            exit 1;
+        }
+    }    
 
 }
 
